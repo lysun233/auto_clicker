@@ -1,0 +1,42 @@
+name: 分别构建并发布每个 EXE
+
+on:
+  push:
+    paths:
+      - '**.cpp'
+    branches:
+      - main  # 修改为你的主分支名（如 master）
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+
+    steps:
+      - name: 拉取代码
+        uses: actions/checkout@v3
+
+      - name: 安装 MinGW 编译器
+        uses: egor-tensin/setup-mingw@v2
+        with:
+          platform: x64
+
+      - name: 安装 gh CLI（GitHub 命令行工具）
+        uses: cli/cli-action@v2
+
+      - name: 编译并发布每个 EXE
+        shell: pwsh
+        run: |
+          Get-ChildItem -Filter *.cpp | ForEach-Object {
+            $cpp = $_.Name
+            $basename = $_.BaseName
+            $exe = "$basename.exe"
+
+            Write-Host "🔧 编译 $cpp 为 $exe"
+            g++ $cpp -o $exe
+
+            Write-Host "🚀 发布 Release: $basename"
+            gh release delete "$basename" -y -R $env:GITHUB_REPOSITORY 2>$null
+            gh release create "$basename" "$exe" --title "$basename" --notes "由 GitHub Actions 自动构建"
+          }
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
